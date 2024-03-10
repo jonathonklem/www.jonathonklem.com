@@ -1,0 +1,21 @@
+---
+title: Now Using Gatsby
+slug: now-using-gatsby
+date: 2024-03-09 03:13:44.000000000 -05:00
+---
+
+export const Thing = () => {
+    const [count, setCount] = React.useState(0);
+
+    return (
+        <button className="bg-blue-300 px-4 py-2 rounded-md border-2 border-black" onClick={(e) => {setCount(count+1)}}>Classic React Click Counter: {count}</button>
+    );
+}
+
+In 2015 I switched this blog from WordPress to Jekyll.  Now, almost a decade later I guess it's time to keep up with the times.  Some items broke or were having problems after I tried to post an update to my blog after almost 8 years of inactivity.  I would have just scrapped the content, but some of the blasts from the past like the [OLF post](/ohio-linux-fest-2015/) I want to preserve.
+
+I like the use of GraphQL and I think the MDX concept is pretty neat.  Being able to include React components in my markdown files seems impractical but I'm sure I'll find something fun to do with it:
+
+<Thing />
+
+I'm also able to integrate Tailwindcss which is another library I have recently fallen in love with.  The only thing I don't like about Gatsby is the error messages are mostly useless.
