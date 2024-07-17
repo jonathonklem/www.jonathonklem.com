@@ -1,0 +1,20 @@
+---
+title: Windows Server Woes
+slug: windows-server-woes
+date: 2024-07-17 11:13:44.000000000 -05:00
+---
+
+I definitely have a skill issue in that I don't work within the Windows server ecosystem very much.  If given the choice, everything I do is Linux based.
+
+I've recently taken on a project where the existing hosting was Windows and they're running a Laravel app.  Access to the machine is via a VPN connection.  I had tried sharing the web root on the dev machine and editing it locally with VSCode.  This worked pretty well.
+
+Magically the website stopped working and there were several permissions issues.  In the Linux world, I've seen this before when uploading files or editing files as root.  It's a simple `chmod` or `chown` command and you're done.  It's also typically easier to determine the user that it needs to be associated with by doing an `ls -lha` in the directory and seeing the owner/group for the majority of the files.
+
+Unfortunately in Windows there is no such magic.  IIS also seems to want to really try to obfuscate how to edit the settings. I had to visit IIS Manager -> websitename -> error pages -> Edit Feature Settings and then turn on 'detailed errors' just to be able to see the actual error in the browser since the log files for IIS did not have the necessary information.
+
+Unfortunately I can't find where in the navigation it was buried but the output was leading me to believe that IIS was running as a different user than it really was.  There was also an `IUSR` user associated with the files that had read permission.
+
+After clearing the cache in Laravel, turning of inherit permissions, trying to restore files from a backup, and numerious other useless actions I finally discovered that I had to go to the root of the web directory and make sure that `IIS_IUSRS` was added to the directory and had full permissions.
+
+I'm not sure if this problem is endemic to IIS, but I remember encountering this exact issue in the past and it was the same `IIS_IUSRS` 'group' that needed to be added to the files (and somehow was mysteriously removed).  So I decided to make a blog post about it in case I start desperately googling in the future, hopefully I'll find this article.
+

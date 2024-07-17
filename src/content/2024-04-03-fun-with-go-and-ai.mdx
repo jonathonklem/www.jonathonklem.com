@@ -1,0 +1,63 @@
+---
+title: Fun with Go and AI
+slug: fun-with-go-and-ai
+date: 2024-04-03 11:13:44.000000000 -05:00
+---
+
+As part of my ongoing efforts to use Go and AI as much as possible, I recently came upon a project where a client needed to translate large text files to another language.
+
+They had been using an online AI service to do this manually.  However, the issue was that it took a long time and they struggled to put the text back into place since they could never translate the whole block together.
+
+I had been playing around with the OpenAI API and knew I could help automate this but the speed was a big questions.  This seemed like a good application for Go's concurrency.
+
+The biggest hurdle when setting this up was the [API rate limits](https://platform.openai.com/docs/guides/rate-limits/usage-tiers?context=tier-free).  I had also never done anything in the real world with concurrency in Go, so managing that was a challenge at first.
+
+Thankfully Go was designed for this and the process was relatively painless.  There were 2 main tools that helped make this all possible: wait groups and channels.  You can see the code [here](https://github.com/jonathonklem/go-translate).  In the end I was able to test it out by translating a 160 page copy of 1984 in about 1 hour.  One hour is slow, but that was mostly to get around the rate limit issues with OpenAI.
+
+<h2 class="text-2xl my-4">WaitGroups</h2>
+
+WaitGroups are handy because they allow you to make sure that every task you initiate gets completed.  You simply declare a WaitGroup, use `.Add(x)` to indicate there are x things you want to wait for.  Once they are finished, you can use `.Done()` to signal the completion.  Finally, `.Wait()` will block until `.Done()` has been called the appropriate number of times.
+
+Here's a simple example: 
+
+```
+package main
+ 
+ import (
+     "sync"
+     "time"
+     "fmt"
+ )
+ 
+ func main() {
+     var wg sync.WaitGroup
+     var waitCount = 3
+ 
+     wg.Add(waitCount)
+ 
+     go func() {
+         fmt.Println("In routine")
+ 
+         for i:=0; i<waitCount; i++ {
+             time.Sleep(2*time.Second)
+             fmt.Println("2 seconds done")
+             wg.Done()
+         }
+     }()
+ 
+     wg.Wait()
+     fmt.Println("Finished waiting")
+ }
+```
+
+I used this to document how many strings I sent to the translate channel so I could know that all of the sets of strings had been translated (or that there was at least an attempt to translate).
+
+<h2 class="text-2xl my-4">Channels</h2>
+
+Channels are queues used by Go to communicate between routines. I was able to leverage this so that there were always X number of go routines running and my main function would pass data to those functions as they were ready for it. 
+
+Because order matters in language, it was also necessary to pass the paragraph number in these channels.  That way if various paragraphs were completed in odd orders, at the end I could reassemble them.
+
+Having the channel as a bottle neck also helped with the rate limiting issues.  In Go you can specify the size of a channel e.g. `englishTexts := make(chan string, 4)`.  This means that you can feed `englishTexts` as many strings as you want, but if it ever gets full your code will block until something frees up space in the channel.  That's also why the `translatedTexts` channel was set to the # of chunks we had.  We did not want any sort of blocking on that and instead wanted to fill up the translatedTexts channel so we could later process all of the translations at once.
+
+![Structure](/go-routines-channels.png)
