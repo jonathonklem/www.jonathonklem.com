@@ -1,0 +1,46 @@
+---
+title: Apple, Driving innovation by being difficult
+slug: apple-driving-innovation-by-being-difficult
+date: 2024-09-07 11:13:44.000000000 -05:00
+---
+
+I’ve been working on adding access control functionality to [ManageMemberships](https://managememberships.com).  On its surface, it seems like a simple problem.  For the first iteration I was wanting to use bluetooth (per the client’s request) to communicate with an esp32 which would then check authentication and allow some sort of electronic lock to disengage.
+
+The ESP32 is fantastic and supports bluetooth and wifi out of the box.  Since this is a production environment and I wanted to include a form of caching and fault tolerance I decided to introduce a separate microprocessor into the mix.  I knew this could also come in handy for logging and handling communication between multiple doors.
+
+![v1](/v1.jpg)
+
+
+The first round was a smashing success.  An android app would send commands to the ESP32 to either provision it or to try to authenticate.  The ESP32 would then communicate with a local raspberry pi to see if that person should have access.  The raspberry-pi would check its redis cache.  If there was no entry, it would then check the web api.  The web api was filtered by ip address to make sure info wouldn’t leak to people it shouldn’t.
+
+The main problem turned out to be Apple.  Android is great and works well with BLE and you can even use BLE in your browser with Chrome.  However, Apple requires extra permissions and I know from previous experience that submitting an app such as this, even if you go the unlisted route, is a huge PITA.
+
+The next iteration, I decided to scrap BLE.  I would check if the user is on a certain IP address (as defined by the user) and if so, in the web browser I would display a button that would send a GET request to the Pi.
+
+![v2](/v2.jpg)
+
+This worked great in testing, but as soon as I moved it to production I had issues with requesting an insecure resource while using SSL.  The production site has an SSL cert, when I’m building locally there’s no SSL cert.  I then played around with the idea of using a self-signed certificate but that seemed just as unreliable and was causing problems.
+
+Especially if the goal is to have easy installation for the end user, I didn’t want to go down too deep of a rabbit hole configuring the local raspberry pi.
+
+So finally I scrapped all of that:
+
+![v3](/v3.jpg)
+
+This eliminates the need for the microprocessor to a pretty high degree, however, I still plan to include it for the sake of future development (QR code scanning and snapping pictures post-scan in).
+
+The process now includes sending a proper HTTPS request to the server.  The server then sets a state to open the door.  The microprocessor fetches this state.  The esp32 then checks this state from the microprocessor side.
+
+It’s significantly more circuitous, but this method would actually allow phone authentication and would even put the option of an app back on the menu.
+
+Going back to my original post about simplicity, I think this checks all of the necessary boxes.  In thinking through potential security issues, I don’t see how any of this would introduce any new security issues that aren’t already present for keyfobs or traditional keys.  Tampering is a problem.  It can also be an issue with stolen credentials.  However stolen key fobs and pry bars already exist.
+
+The full process currently works out to
+User authenticates on website
+Website checks user’s IP, if it’s within a list, display button to connect to door
+User clicks button to open door, system checks authentication again and sets door to open
+Arduino scans every 10 seconds for changes to open the door.  If it receives that, it stores it in a redis cache.  Once ‘open’ is received, cloud server sets the status back to ‘closed’ (so that it only stays ‘open’ for 1 request)
+ESP32 scans the arduino every second for changes to door state, if ‘open’ is received, sends a signal via relay to the door controller.
+
+In future iterations I plan to add a QR code scanner, rfid scanner (for legacy rfid keys that have already been handed out) and there’s room to add other methods such as a pin system for maintenance or contractors.
+

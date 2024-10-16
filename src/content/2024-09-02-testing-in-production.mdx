@@ -1,0 +1,31 @@
+---
+title: Testing in production, Living the dream?
+slug: testing-in-production-sentry-io
+date: 2024-09-02 11:13:44.000000000 -05:00
+---
+I've been enamored with the Laravel ecosystem for quite some time.  I've shipped quite a few projects for clients and even my own project: [ManagememberShips.com](https://managememberships.com).
+
+In the past I was an advocate of CakePHP, however, out of the box Laravel has more robust support for testing, database seeding,  and migrations which makes it feel like a more appropriate fit for more complex applications.
+
+Artisan is also fantastic and `artisan tinker` has proven invaluable numerous times when trying to decipher why things are not working the way I want them to.  Tinker let's you interact with Laravel in real-time, writing code and eloquent queries and seeing the output in real-time.  In many instances, I find this more helpful than the traditional `dd($variable)` or `die(printf($variable))`.
+
+Aside from all this goodness, I've been using [sentry.io](https://sentry.io).  This has a backend and a frontend component which can document and send email alerts when your users encounter 500 server errors or even JavaScript errors.
+
+This came in handy recently when, despite all my best testing efforts, it was identifying a JavaScript error that would show up on the registration page that seemed to be isolated to Huawei phones.  I've tested on physical Samsung and Apple phones on mobile data and wifi but apparently with the right combination network speed and phone hardware, the Stripe library wasn't finishing loading before it was being used making it so people could not check out.
+
+It can also spot inefficiencies.  Eloquent’s ORM can be simple and elegant but sometimes that elegance can hide some ugly inefficiencies.  I was working on a project that involved looping through some database entries and was doing it like this:
+
+![eloquent orm](/sentry-post/eloquent-code.png)
+
+In the execution, it was performing a query and doing nested queries from that.  This is referred to as an "N+1" problem.  Since it was working and our dataset was small, I didn't bother questioning the logic of it all.
+
+Sentry was able to identify this and give a breakdown of all the sub queries:
+
+![n+1](/sentry-post/identify-n+1.png)
+![n+1, details](/sentry-post/show-n+1.png)
+
+Armed with this knowledge, I was able to refactor the code before it had even become a noticeable problem:
+![refactored](/sentry-post/refactored.png)
+
+Obviously thorough testing is important.  I will continue to use automated unit and feature tests, but it's impossible to catch everything and tools like [sentry.io](https://sentry.io) have definitely increased my confidence when launching software into the wild.
+

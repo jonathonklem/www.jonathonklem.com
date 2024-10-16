@@ -1,0 +1,15 @@
+---
+title: New Project - Activity Ideas Now
+slug: activity-ideas-now
+date: 2024-08-06 11:13:44.000000000 -05:00
+---
+
+I had a slow day the other day and decided to continue my tinkering with Golang and Serverless architecture.  I rather quickly banged out [Activity Ideas Now](https://www.activityideasnow.com/).
+
+On the infrastructure side, I went with AWS Lambda and an S3 bucket to keep things lightweight and scalable. CloudFront is in the mix to handle SSL.  I started off hoping to do it all in AWS, including Route53 for the DNS.  However, AWS makes the process of adding an SSL certificate incredibly complicated.  I started using a cloudfront distribution but there were propagation issues and eventually I said screw it and took the free and easy way out.
+
+For the frontend I kept is incredibly simple with just jQuery/HTML/CSS.  I almost just used vanilla JS and I still may rewrite it.  However, quickly prototyping was the name of the game here.  It's a simple 5 input form.  Those inputs get fed via AJAX to the lambda function.  
+
+On the Go side, I borrowed heavily from my previous work at [Fun wigh Go and AI](https://jonathonklem.com/fun-with-go-and-ai/) and took those inputs and fed it to ChatGPT.  From there I just had to make sure to be explicity with my instructions and require ChatGPT to give the responses in JSON format.  
+
+The end result proved to be surprisingly useful.  My wife and I have been using it to brainstorm activities.  Because of the nature of ChatGPT it's never 100% accurate on the timing, but it alerted us to a scavenger hunt at our local library this month and has inspired us to check out some local parks we have not yet visited.
